@@ -1,20 +1,21 @@
 import requests
 import logging
+from typing import Dict, List, Tuple, Optional
 
 class YouTubeTrending:
     def __init__(
         self,
-        base_url='https://www.youtube.com/youtubei/v1/browse',
-        country_code='FR',
-        headers={'Content-Type': 'application/json'},
-        prefix_url='https://www.youtube.com/watch?v='
-        ):
+        base_url: str = 'https://www.youtube.com/youtubei/v1/browse',
+        country_code:  str = 'FR',
+        headers: Dict[str, str] ={'Content-Type': 'application/json'},
+        prefix_url: str = 'https://www.youtube.com/watch?v='
+        ) -> None:
         self.base_url = base_url
         self.headers = headers
         self.country_code = country_code
         self.prefix_url = prefix_url
 
-    def fetch_trending(self):
+    def fetch_trending(self) -> Tuple[Optional[List[Dict[str, str]]], Optional[List[Dict[str, str]]]]:
         json_data = self._build_request_payload()
         response = requests.post(self.base_url, json=json_data, headers=self.headers)
 
@@ -28,7 +29,7 @@ class YouTubeTrending:
             logging.error(f"Failed to fetch data: Status Code {response.status_code}")
         return None, None
 
-    def _build_request_payload(self):
+    def _build_request_payload(self) -> Dict[str, any]:
         return {
             'context': {
                 'client': {
@@ -41,7 +42,7 @@ class YouTubeTrending:
             'browseId': 'FEtrending',
         }
 
-    def _parse_youtube_response(self, json_response):
+    def _parse_youtube_response(self, json_response: Dict[str, any]) -> Tuple[Optional[List[Dict[str, str]]], Optional[List[Dict[str, str]]]]:
         try:
             contents = json_response["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"]
             video_data = self._extract_videos(contents)
@@ -52,7 +53,7 @@ class YouTubeTrending:
             return None, None
         
 
-    def _extract_videos(self, contents):
+    def _extract_videos(self, contents: List[Dict[str, any]]) -> List[Dict[str, str]]:
         videos = []
         for section in contents:
             try:
@@ -71,7 +72,7 @@ class YouTubeTrending:
 
         return videos
 
-    def _extract_shorts(self, contents):
+    def _extract_shorts(self, contents: List[Dict[str, any]]) -> List[Dict[str, str]]:
         shorts = []
         for section in contents:
             try:
