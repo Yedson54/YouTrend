@@ -13,7 +13,7 @@
 - **videoType**: type de la vidéo; s'applique uniquement aux vidéos en tendance. Peut être "Now" (en tendances maintenant) "Recently Trending" (était en tendances), "Music", "Gaming", "Movies"
 - **trendingCountry**: code du Pays dans laquelle la vidéo est en tendance
 - **exactViewNumber**: nombre de vues exactes
-- **numberLikes**: nombre de likes. Si le créateur ne souhaite pas avoir de like, la **numberLikes** prend la valeur _Like_
+- **numberLikes**: nombre de likes. Si le créateur ne souhaite pas avoir de like, la variable **numberLikes** prend la valeur _Like_
 - **videoDate**: date (mois, jour, année) de publication de la vidéo, avec quelques variations pour les musiques et les videos (_Premiered, Streamed live_ on...)
 - **creatorSubscriberNumber**: nombre d'inscriptions à la chaine du créateur de la vidéo
 - **videoVerboseDescription**: description de la vidéo. NaN pour les vidéos sans description
