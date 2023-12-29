@@ -26,7 +26,11 @@ from backend.utils import (
     get_video_details
 )
 
-API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
+from dotenv import load_dotenv
+from os.path import join, dirname
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+print(dotenv_path)
 
 with open("backend/models/duration_model.pickle", "rb") as f:
     FINAL_MODEL = pickle.load(f)
@@ -47,7 +51,7 @@ def _normalize(series, data_max, data_min):
 def survival_probability(
         video_link,
         date: Optional[str] = None, 
-        api_key: str = API_KEY,
+        YOUTUBE_API_KEY: str = YOUTUBE_API_KEY,
         region_code: str = "US",
         video_cat_enc: OneHotEncoder = None
 ) -> float:
@@ -57,7 +61,7 @@ def survival_probability(
     Parameters:
     - video_link: The link to the video.
     - date: Date for calculating survival probability.
-    - api_key: YouTube Data API key.
+    - YOUTUBE_API_KEY: YouTube Data API key.
     - region_code: Region code for fetching category labels.
     - video_cat_enc: One-hot encoder for video categories.
 
@@ -66,7 +70,7 @@ def survival_probability(
     """
     single_df = get_video_details(
         video_link=video_link,
-        api_key=api_key,
+        YOUTUBE_API_KEY=YOUTUBE_API_KEY,
         region_code=region_code,
         video_cat_enc=video_cat_enc
     )
@@ -120,7 +124,7 @@ def plot_survival_probability(
         duration_days: int = 10, 
         gap: float = 0.5,
         video_link: str = None,  
-        api_key: str = API_KEY,
+        YOUTUBE_API_KEY: str = YOUTUBE_API_KEY,
         region_code: str = "US",
         video_cat_enc: OneHotEncoder = None
 ):
@@ -144,7 +148,7 @@ def plot_survival_probability(
         p_survivals[i] = survival_probability(
             date = current_date,
             video_link = video_link, 
-            api_key = api_key,
+            YOUTUBE_API_KEY = YOUTUBE_API_KEY,
             region_code = region_code,
             video_cat_enc = video_cat_enc
         )

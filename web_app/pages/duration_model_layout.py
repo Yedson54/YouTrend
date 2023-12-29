@@ -13,6 +13,7 @@ from backend.utils import get_video_id
 
 
 
+
 layout = html.Div([
     html.Br(),
     dbc.Row([
@@ -132,7 +133,7 @@ def update_layout_proba(btn1):
 )
 def get_proba(link, date, btn2):
     p = survival_probability(
-        link, 
+        video_link = link, 
         date=date,
         video_cat_enc=VIDEO_CAT_ENCODER
     )

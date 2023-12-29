@@ -136,6 +136,9 @@ def query_and_save_image(prompt, img_count, token):
         image = Image.open(io.BytesIO(response.content))
         max_size = (450, 450)
         image.thumbnail(max_size, Image.ANTIALIAS)
+        dir_path = "assets"
+        if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
         filename = f"assets/image_{img_count}.png"
         image.save(filename)
         return filename
@@ -195,6 +198,7 @@ def update_image(
                 dash.no_update, stored_images)
 
     elif 'thumbnail' in trigger_id:
+    
         img_index = json.loads(trigger_id.split('.')[0])['index'] - 1
         selected_image_data = stored_images[img_index]
         download_link = f'/assets/image_{img_index + 1}.png'

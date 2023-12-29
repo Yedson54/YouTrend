@@ -18,4 +18,5 @@ services:
       - ./data:/data  # Mounts 'my_volume' to '/data' in the container
     ports:
       - "8000:8000"  # Maps port 8000 of the container to port 8000 on the host
-
+    env_file:
+      - .env

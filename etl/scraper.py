@@ -5,10 +5,8 @@ from datetime import date
 import time
 import os
 import ast
-from dotenv import load_dotenv
-from os.path import join, dirname
-dotenv_path = join(dirname(__file__), '.env')
-load_dotenv(dotenv_path)
+
+
 DATA_DICTIONARY_TEMPLATE =  { # Will be filled inplace
     "videoTitle": [],
     "videoId": [],
@@ -306,6 +304,9 @@ french_data_dictionary = {
 
 NATIONALITY_CODE = ast.literal_eval(os.getenv("NATIONALITY_CODE"))
 TRENDING_TYPE_DICT= ast.literal_eval(os.getenv("TRENDING_TYPE_DICT"))
+
+
+
 
 response_dict = post_request_ytb(NATIONALITY_CODE, TRENDING_TYPE_DICT)
 add_now_videos_shorts(response_dict, french_data_dictionary)
