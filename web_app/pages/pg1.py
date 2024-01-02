@@ -17,7 +17,8 @@ creator_count = base.groupby(by='videoCreatorName', as_index=False).size()
 creator_count.columns = ['videoCreatorName', 'Count']
 creator_mean = base.groupby(
     by='videoCreatorName',
-    as_index=False).mean()[['videoCreatorName', 'nbview', 'nblikes']]
+    as_index=False).mean(numeric_only=True)[
+        ['videoCreatorName', 'nbview', 'nblikes']]
 creator_mean.columns = ['videoCreatorName', 'Views', 'Likes']
 
 creator = pd.merge(
@@ -29,7 +30,8 @@ creator = creator.sort_values('Views', ascending=False)
 
 category = base.groupby(
     by='videoCategory',
-    as_index=False).mean()[['videoCategory', 'nbview', 'nblikes']]
+    as_index=False).mean(numeric_only=True)[
+        ['videoCategory', 'nbview', 'nblikes']]
 category.columns = ['videoCategory', 'Views', 'Likes']
 
 category_count = base.groupby(by='videoCategory', as_index=False).size()
@@ -45,7 +47,7 @@ layout = html.Div([
         dcc.Dropdown(
             id='choice_creator',
             options=creator['videoCreatorName'],
-            value=creator['videoCreatorName'][:5],
+            value=list(creator['videoCreatorName'])[:5],
             multi=True
         )
     ]),
