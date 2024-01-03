@@ -6,6 +6,11 @@ app = dash.Dash(
     use_pages=True,
     external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+from pages.auth import add_auth_callbacks
+import pages.pg3 as pg3
+add_auth_callbacks(app)
+pg3.add_model_callbacks(app)
+
 navbar = dbc.NavbarSimple(
     children=[
         dbc.NavItem(
@@ -24,3 +29,4 @@ app.layout = dbc.Container([
 
 if __name__ == "__main__":
     app.run_server(port=4050)
+    
