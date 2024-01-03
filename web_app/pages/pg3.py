@@ -72,7 +72,6 @@ def add_model_callbacks(app):
         ctx = dash.callback_context
         if not ctx.triggered:
             return dash.no_update
-
         trigger_id = ctx.triggered[0]['prop_id']
         button_text = "Generate Image"
 
