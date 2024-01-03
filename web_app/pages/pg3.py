@@ -9,14 +9,12 @@ import json
 
 dash.register_page(__name__, name='StableDiffusion')
 
-# Define repeated styles
 center_style = {'textAlign': 'center'}
 button_style = {'display': 'block'}
 thumbnail_style = {'max-width': '100px', 'height': 'auto', 'margin': '10px'}
 hidden_style = {'display': 'none'}
 fixed_right_bottom_style = {'position': 'fixed', 'right': '10px', 'bottom': '10px'}
 
-# Layout
 layout = html.Div([
     html.H3('Custom Thumbnail Generator', style=center_style),
     html.P('Enter a prompt to generate your video thumbnail. You can regenerate or download different images according to your needs and choose the one that suits you best.', style={'textAlign': 'center'}),
@@ -31,12 +29,10 @@ layout = html.Div([
     dcc.Store(id='store-previous-images', data=[])
 ])
 
-# Utility function to encode image
 def encode_image(image_path):
     with open(image_path, 'rb') as image_file:
         return base64.b64encode(image_file.read()).decode()
 
-# Function to query the API and save the image
 def query_and_save_image(prompt, img_count):
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
     headers = {"Authorization": "Bearer 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"}
@@ -52,10 +48,10 @@ def query_and_save_image(prompt, img_count):
     else:
         return None
 
-# Callback for updating the image
+# updating the image
 @callback(
     Output('image-container', 'children'),
-    Output('submit-button', 'children'),  # Output to update button text
+    Output('submit-button', 'children'),
     Output('download-link', 'href'),
     Output('download-link', 'style'),
     Output('previous-images', 'children'),
