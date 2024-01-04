@@ -5,7 +5,7 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 
-dash.register_page(__name__, name='DesStats')
+dash.register_page(__name__, name='Statistics')
 
 base = pd.read_csv('pages/donnees/french_youtube_10_12_23.csv')
 base['nbview'] = base['exactViewNumber'].str.extract(
