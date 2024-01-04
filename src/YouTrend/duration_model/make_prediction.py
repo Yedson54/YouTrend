@@ -1,202 +1,158 @@
-import os
-import re
-from typing import List, Tuple, Optional
-from urllib.parse import urlparse, parse_qs
+"""
+Make prediction
 
-# import numpy as np
+This module provides functions for analyzing the probability of YouTube
+videos to not reach trend based on various features, including video length,
+creator's subscriber count, and publication date.
+
+Functions:
+- survival_probability: Calculate survival probability for a video.
+
+- plot_survival_probability:  Plot the survival probability over a specified
+    duration for a given video.
+"""
+import os
+import pickle
+import datetime
+from typing import List, Tuple, Optional
+
+import numpy as np
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+
+from utils import (
+    get_video_details,
+    preprocessing
+)
 
 API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
 
+with open("../data/duration_model.pickle", "rb") as f:
+    FINAL_MODEL = pickle.load(f)
 
-def preprocessing(
-        filename: str = None,
-        dataframe: pd.DataFrame = None,
-        on_loading: bool = False,
-        video_cat_enc: OneHotEncoder = None,
-) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
+with open("../data/video_category_encoder.pickle", "rb") as f:
+    VIDEO_CAT_ENCODER = pickle.load(f)
+
+super_df, model_features, cat_encoder = preprocessing(
+    '../data/duration_model_data.csv'
+)
+
+
+def _normalize(series, data_max, data_min):
+    return np.maximum((series - data_min) / (data_max - data_min), [0])
+
+def survival_probability(
+        video_link,
+        date: Optional[str] = None, 
+        api_key: str = API_KEY,
+        region_code: str = "US",
+        video_cat_enc: OneHotEncoder = None
+) -> float:
     """
-    Process the input data for the machine learning model.
+    Calculate survival probability for a video.
 
-    Args:
-        filename (str): Path to the CSV file containing the data.
-        dataframe (pd.DataFrame): DataFrame containing the data.
+    Parameters:
+    - video_link: The link to the video.
+    - date: Date for calculating survival probability.
+    - api_key: YouTube Data API key.
+    - region_code: Region code for fetching category labels.
+    - video_cat_enc: One-hot encoder for video categories.
 
     Returns:
-        df (pd.DataFrame): Processed DataFrame.
-        model_features (list): List of features for the duration model.
-        encoder (sklearn.preprocessing.OneHotEncoder): OneHotEncoder for
-            later preprocessing before predictions.
+    - Survival probability as a float.
     """
-    # Define features and date columns
-    features = [
-        'videoId', 'videoExactPublishDate', 'creatorSubscriberNumber',
-        'videoLengthSeconds', 'videoCategory', 'isCreatorVerified',
-        'scanTimeStamp', 'firstTrendingTime', 'isTrend',
-        'timeToTrendSeconds'
-    ]
-    date_cols = [
-        'videoExactPublishDate', 'scanTimeStamp', 'firstTrendingTime'
-    ]
-
-    # Check if either a filename or a DataFrame has been provided
-    if filename is None and dataframe is None:
-        raise ValueError("Either a filename or a DataFrame must be provided.")
-    elif filename is not None and dataframe is not None:
-        raise ValueError("Only one of filename or DataFrame should be provided.")
-    elif filename is not None:
-        # Check if file exists
-        if not os.path.isfile(filename):
-            raise ValueError(f"File {filename} does not exist.")
-        # Read data from CSV file
-        df = pd.read_csv(filename, usecols=features)
-    else:
-        # Check if DataFrame is not empty
-        if dataframe.empty:
-            raise ValueError("Provided DataFrame is empty.")
-        df = dataframe
-        if on_loading:
-            df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
-            encoded_categories = pd.DataFrame(
-                video_cat_enc.transform(
-                    df[['videoCategory']].to_numpy().reshape(-1, 1)),
-                columns=video_cat_enc.categories_
-            )
-            encoded_categories.columns = pd.Index(
-                ['videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
-                for cat in encoded_categories.columns.get_level_values(0)]
-            )
-            df = pd.concat([df, encoded_categories], axis=1)
-            prediction_features = [
-                "videoExactPublishDate",
-                "videoLengthSeconds",
-                "creatorSubscriberNumber"
-            ] + encoded_categories.columns.to_list()
-            df = df[prediction_features]
-
-            return df, prediction_features, None
-
-    # Convert datetime columns and pass boolean columns to int
-    df[date_cols] = df[date_cols].apply(pd.to_datetime, format='ISO8601')
-    df[["isTrend", "isCreatorVerified"]] = df[["isTrend", "isCreatorVerified"]].astype(int)
-
-    # Convert timeToTrend in days
-    df["timeToTrendDays"] = (df["timeToTrendSeconds"] / 86400).astype(int)
-
-    # Extract day of the week from videoExactPublishDate
-    df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
-
-    # One-hot encode the 'videoCategory' column
-    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
-    one_hot = encoder.fit_transform(df[['videoCategory']])
-    categories = encoder.categories_[0]
-    categories = [
-        'videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
-        for cat in categories
-    ]
-    one_hot_df = pd.DataFrame(one_hot, columns=categories)
-    df = pd.concat([df, one_hot_df], axis=1)
-
-    # Model features for machine learning
-    model_features = [
-        'timeToTrendDays', 'isTrend', 'creatorSubscriberNumber',
-        'videoLengthSeconds',
-    ] + [col for col in df.columns if col.startswith('videoCat_')]
-
-    return df, model_features, encoder
-
-
-def get_video_details(
-        video_link: str,
-        api_key: str=API_KEY,
-        region_code: str="US",
-        video_cat_enc: Optional[OneHotEncoder]=None
-) -> pd.DataFrame:
-    youtube = build('youtube', 'v3', developerKey=api_key)
-
-    categories_dict = _get_category_labels(api_key, region_code, youtube)
-
-    video_id = _get_video_id(video_link)
-
-    try:
-        response = youtube.videos().list(
-            part='snippet,statistics,contentDetails',
-            id=video_id
-        ).execute()
-
-        video_info = response['items'][0]
-
-        data = {
-            'videoId': [video_id],
-            'Titre': [video_info['snippet']['title']],
-            'videoExactPublishDate': [video_info['snippet']['publishedAt']],
-            'videoLengthSeconds': [_convert_duration_to_seconds(
-                video_info['contentDetails']['duration'])],
-            'videoType': [video_info['snippet']['liveBroadcastContent']],
-            'videoCategory': [video_info['snippet']['categoryId']],
-            'exactViewNumber': [video_info['statistics']['viewCount']],
-            'numberLikes': [video_info['statistics']['likeCount']],
-            'numberOfComments': [video_info['statistics']['commentCount']],
-            'isCreatorVerified': [video_info['snippet']['channelId']],
-            'videoKeywords': [video_info['snippet'].get('tags', [])],
-            'creatorSubscriberNumber': [_get_channel_subscriber_count(
-                youtube, [video_info['snippet']['channelId']])]
-        }
-
-        df = pd.DataFrame(data)
-        df["videoCategory"] = df["videoCategory"].replace(categories_dict)
-        df["videoExactPublishDate"] = pd.to_datetime(
-            df["videoExactPublishDate"]
-        ).dt.tz_localize(None)
-        df, _, _ = preprocessing(dataframe=df, on_loading=True, video_cat_enc=video_cat_enc)
-
-        return df
-
-    except HttpError as e:
-        print(f"An error occurred: {e}")
-        return None
-
-def _get_video_id(video_link: str) -> str:
-    parsed_url = urlparse(video_link)
-    video_id = (
-        parsed_url.path[1:]
-        if parsed_url.netloc == 'youtu.be'
-        else parse_qs(parsed_url.query).get('v', [None])[0]
+    single_df = get_video_details(
+        video_link=video_link,
+        api_key=api_key,
+        region_code=region_code,
+        video_cat_enc=video_cat_enc
     )
-    return video_id
 
-def _get_category_labels(api_key: str, region_code: str='US', youtube=None):
-    if youtube is None:
-        youtube = build('youtube', 'v3', developerKey=api_key)
+    date = pd.to_datetime(date) if date else datetime.datetime.now()
 
-    categories_response = youtube.videoCategories().list(
-        part='snippet',
-        regionCode=region_code
-    ).execute()
+    single_df['timeToTrendDays'] = (
+        date - single_df["videoExactPublishDate"]
+    ).dt.total_seconds() / (24 * 3600)
 
-    return {
-        category['id']: category['snippet']['title']
-        for category in categories_response['items']
-    }
+    scaler = MinMaxScaler()
+    scaler.fit(super_df[['creatorSubscriberNumber']])
+    single_df['creatorSubscriberNumber'] = _normalize(
+        single_df['creatorSubscriberNumber'], scaler.data_max_[0], scaler.data_min_[0]
+    )
+    scaler.fit(super_df[['videoLengthSeconds']])
+    single_df['videoLengthSeconds'] = _normalize(
+        single_df['videoLengthSeconds'], scaler.data_max_[0], scaler.data_min_[0]
+    )
 
-def _convert_duration_to_seconds(duration: str) -> int:
-    duration_pattern = re.compile(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
-    match = duration_pattern.match(duration)
-    return sum(int(n or 0) * factor for n, factor in zip(match.groups(), [3600, 60, 1]))
-
-def _get_channel_subscriber_count(api, channel_ids):
-    try:
-        response = api.channels().list(
-            part="statistics",
-            id=','.join(channel_ids)
-        ).execute()
-        return (
-            int(response["items"][0]['statistics']["subscriberCount"]) 
-            if 'items' in response else None
+    def predict_cumulative_hazard_at_single_time(
+            self, X, times, ancillary_X=None):
+        lambda_, rho_ = (
+            self._prep_inputs_for_prediction_and_return_scores(X, ancillary_X)
         )
-    except HttpError as e:
-        print(f"An error occurred: {e}")
-        return None
+        return (times / lambda_) ** rho_
+
+    def predict_survival_function_at_single_time(
+            self, X, times, ancillary_X=None):
+        return np.exp(
+            -self.predict_cumulative_hazard_at_single_time(
+                X, times=times,ancillary_X=ancillary_X)
+        )
+
+    FINAL_MODEL.predict_survival_function_at_single_time = (
+        predict_survival_function_at_single_time.__get__(FINAL_MODEL)
+    )
+    FINAL_MODEL.predict_cumulative_hazard_at_single_time = (
+        predict_cumulative_hazard_at_single_time.__get__(FINAL_MODEL)
+    )
+
+    p_surv = FINAL_MODEL.predict_survival_function_at_single_time(
+        single_df, single_df['timeToTrendDays']
+    )
+
+    return p_surv
+
+def plot_survival_probability(
+        single_df,
+        start_date: Optional[str] = None, 
+        duration_days: int = 10, 
+        gap: float = 0.5,
+        video_link: str = None,  
+        api_key: str = API_KEY,
+        region_code: str = "US",
+        video_cat_enc: OneHotEncoder = None
+):
+    # Prepare the DataFrame
+    video_test = single_df.copy()
+    video_test['duration_in_day'] = duration_days
+    duration = [gap * (i + 1) for i in range(int(duration_days / gap))]
+    video_test_duplicate = pd.concat([video_test for _ in range(len(duration))])
+    video_test_duplicate.set_index(pd.Index(range(len(duration))), inplace=True)
+    video_test_duplicate['duration_in_day'] = duration
+
+    # Calculate survival probabilities
+    p_survivals = np.zeros(len(duration))
+    date_0 = single_df.loc[0, "videoExactPublishDate"]
+    if start_date:
+        start_date = pd.to_datetime(start_date)
+        date_0 = max(start_date, date_0)
+
+    for i, dur in enumerate(duration):
+        current_date = date_0 + pd.Timedelta(days=dur)
+        p_survivals[i] = survival_probability(
+            date = current_date,
+            video_link = video_link, 
+            api_key = api_key,
+            region_code = region_code,
+            video_cat_enc = video_cat_enc
+        )
+
+    # Plot the survival probabilities
+    x = list(range(1, len(duration) + 1))
+    y = list(p_survivals)
+    plt.step(x, y, where='post', label='')
+    plt.title('Fonction de survie')
+    plt.xlabel('duree en 6 heures')
+    plt.ylabel('Probabilite')
+    plt.legend()
+    plt.show()

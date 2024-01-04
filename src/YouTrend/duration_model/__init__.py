@@ -1,8 +1,10 @@
 """
 Load 
-- "duration_model"
-- "duration_model_data_df".
-- "video_category_encoder"
+- from parent directory, load "data/duration_model.pickle" as DURATION_MODEL
+- from parent directory, load "data/duration_model_data.csv" as
+DURATION_MODEL_DF using make_prediction.preprocessing function
+- from parent directory, load "data/video_category_encoder.pickle" as
+VIDEO_CAT_ENCODER
 """
 from pathlib import Path
 import json
