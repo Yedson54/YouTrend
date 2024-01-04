@@ -12,15 +12,17 @@ Functions:
 - create_duration_model_columns: Adjust the end date of the data based on the
   chosen frequency and compute the duration before trending for each video.
 """
+import os
 import glob
-from typing import List, Literal
+from typing import List, Tuple, Optional, Literal
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series, Timedelta
+from sklearn.preprocessing import OneHotEncoder
 
 
-def load_data(
+def _load_data(
         folder: str = None,
         pattern: str = "dataset*",
         use_filenames: bool = False,
@@ -89,7 +91,7 @@ def _parse_numeric_column(series: Series) -> Series:
     return result_series
 
 
-def clean_columns(data: pd.DataFrame) -> pd.DataFrame:
+def _clean_columns(data: pd.DataFrame) -> pd.DataFrame:
     """
     Clean columns in a DataFrame.
 
@@ -120,7 +122,7 @@ def clean_columns(data: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def create_duration_model_columns(
+def _create_duration_model_columns(
         data: DataFrame,
         frequency: Literal["hour", "day"] = "hour"
 ) -> DataFrame:
@@ -161,11 +163,12 @@ def create_duration_model_columns(
 
 
 def processing_for_duration_model(
-        folder: str = None,
+        folder: str = "../../../data", #TODO: move data folder closer
         pattern: str = "dataset*",
         use_filenames: bool = False,
         filenames: List[str] = None,
-        frequency: Literal["hour", "day"] = "hour") -> DataFrame:
+        frequency: Literal["hour", "day"] = "hour"
+) -> DataFrame:
     """
     Perform data processing operations for a duration model.
 
@@ -191,7 +194,7 @@ def processing_for_duration_model(
         DataFrame: The processed DataFrame for the duration model.
     """
     # Load data
-    data = load_data(
+    data = _load_data(
         folder=folder,
         pattern=pattern,
         use_filenames=use_filenames,
@@ -199,9 +202,99 @@ def processing_for_duration_model(
     )
 
     # Clean columns
-    cleaned_data = clean_columns(data)
+    cleaned_data = _clean_columns(data)
 
     # Create duration model columns
-    processed_data = create_duration_model_columns(cleaned_data, frequency)
+    processed_data = _create_duration_model_columns(cleaned_data, frequency)
 
     return processed_data
+
+
+### -------------------------------------------------------------------------
+def process_on_loading(
+        filename: str = None,
+        dataframe: pd.DataFrame = None,
+        on_loading: bool = False,
+        video_cat_enc: OneHotEncoder = None
+) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
+    """
+    Process the input data for the machine learning model.
+
+    Args:
+        filename (str): Path to the CSV file containing the data.
+        dataframe (pd.DataFrame): DataFrame containing the data.
+
+    Returns:
+        df (pd.DataFrame): Processed DataFrame.
+        model_features (list): List of features for the duration model.
+        encoder (sklearn.preprocessing.OneHotEncoder): OneHotEncoder for
+            later preprocessing before predictions.
+    """
+    # Define features and date columns
+    features = [
+        'videoId', 'videoExactPublishDate', 'creatorSubscriberNumber',
+        'videoLengthSeconds', 'videoCategory', 'isCreatorVerified',
+        'scanTimeStamp', 'firstTrendingTime', 'isTrend',
+        'timeToTrendSeconds'
+    ]
+    date_cols = [
+        'videoExactPublishDate', 'scanTimeStamp', 'firstTrendingTime'
+    ]
+
+    # Check if either a filename or a DataFrame has been provided
+    if filename is None and dataframe is None:
+        raise ValueError("Either a filename or a DataFrame must be provided.")
+    elif filename is not None and dataframe is not None:
+        raise ValueError("Only one of filename or DataFrame should be provided.")
+    elif filename is not None:
+        # Check if file exists
+        if not os.path.isfile(filename):
+            raise ValueError(f"File {filename} does not exist.")
+        # Read data from CSV file
+        df = pd.read_csv(filename, usecols=features)
+    else:
+        # Check if DataFrame is not empty
+        if dataframe.empty:
+            raise ValueError("Provided DataFrame is empty.")
+        df = dataframe
+        if on_loading:
+            encoded_categories = pd.DataFrame(
+                video_cat_enc.transform(
+                    df[['videoCategory']].to_numpy().reshape(-1, 1)),
+                columns=video_cat_enc.categories_
+            )
+            encoded_categories.columns = pd.Index(
+                ['videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
+                for cat in encoded_categories.columns.get_level_values(0)]
+            )
+            df = pd.concat([df, encoded_categories], axis=1)
+            return df, None, None
+
+    # Convert datetime columns and pass boolean columns to int
+    df[date_cols] = df[date_cols].apply(pd.to_datetime, format='ISO8601')
+    df[["isTrend", "isCreatorVerified"]] = df[["isTrend", "isCreatorVerified"]].astype(int)
+
+    # Convert timeToTrend in days
+    df["timeToTrendDays"] = (df["timeToTrendSeconds"] / 86400).astype(int)
+
+    # Extract day of the week from videoExactPublishDate
+    df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
+
+    # One-hot encode the 'videoCategory' column
+    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+    one_hot = encoder.fit_transform(df[['videoCategory']])
+    categories = encoder.categories_[0]
+    categories = [
+        'videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
+        for cat in categories
+    ]
+    one_hot_df = pd.DataFrame(one_hot, columns=categories)
+    df = pd.concat([df, one_hot_df], axis=1)
+
+    # Model features for machine learning
+    model_features = [
+        'timeToTrendDays', 'isTrend', 'creatorSubscriberNumber',
+        'videoLengthSeconds',
+    ] + [col for col in df.columns if col.startswith('videoCat_')]
+
+    return df, model_features, encoder
