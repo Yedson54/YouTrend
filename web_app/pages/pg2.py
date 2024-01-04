@@ -1,12 +1,12 @@
 import dash
-from dash import dcc, html, callback, ctx
+from dash import dcc, html, callback
 from dash.dependencies import Input, Output, State
 import dash_bootstrap_components as dbc
 # import pandas as pd
 # import plotly.express as px
 import re
 
-dash.register_page(__name__, name='DurMod')
+dash.register_page(__name__, name='Duration Model')
 
 with open("pages/scripts/script_duration_model.py") as f:
     exec(f.read())
