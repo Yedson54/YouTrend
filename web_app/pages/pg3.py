@@ -53,7 +53,9 @@ layout2 = html.Div([
     html.P(
         'Enter a prompt to generate your video thumbnail. ' +
         'You can regenerate or download different images according ' +
-        'to your needs and choose the one that suits you best.',
+        'to your needs and choose the one that suits you best. ' +
+        'For example, you can try the following prompt: ' +
+        '"Cartoon of a cheerful man happy to eat a Mexican taco"',
         style={'textAlign': 'center'}),
     dbc.Row([
         dbc.Col([
