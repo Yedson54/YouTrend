@@ -7,10 +7,10 @@ Welcome to YouTrend, your ultimate companion in deciphering the intricacies of Y
 ### 1. [Scraper: Unveiling the Data Goldmine](./scraper.md)
 YouTrend's Scraper module is your key to unlocking the vast treasure trove of data from the Google YouTube API. Seamlessly collect detailed information about trending videos, paving the way for a deeper understanding of the trends that captivate audiences.
 
-### 2. [Exploratory Data Analysis: Decoding Trends](./exploratory_data_analysis.md)
+### 2. [Exploratory Data Analysis: Decoding Trends](./app.md)
 Dive into the heart of trending videos with our Exploratory Data Analysis feature. Uncover hidden patterns, identify emerging themes, and visualize key insights through interactive graphics. Gain a profound understanding of what makes a video trend-worthy and stay ahead of the curve.
 
-### 3. [Text to Image: Visualizing Potential](./text_to_image.md)
+### 3. [Text to Image: Visualizing Potential](./stable_diffusion.md)
 Revolutionize the way you approach video promotion with our Text to Image feature. By analyzing video descriptions and titles, YouTrend suggests compelling images tailored to enhance the visual appeal of your content. Elevate your video thumbnails, increasing the likelihood of catching the eye of potential viewers.
 
 ### 4. [Duration Model: Predicting Success](./duration_model.md)
