@@ -1,14 +1,14 @@
 import pandas as pd
+import os
+import datetime
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from sklearn.preprocessing import OneHotEncoder
 
-my_encoder = OneHotEncoder(handle_unknown='ignore')
-
-super_df = pd.read_csv('pages/donnees/duration_model_data.csv')
-
-n = len(super_df.videoCategory.unique())
-col_names = ['Video_cat_{}'.format(i) for i in range(n)]
+# my_encoder = OneHotEncoder(handle_unknown='ignore')
+# super_df = pd.read_csv('pages/donnees/duration_model_data.csv')
+# n = len(super_df.videoCategory.unique())
+# col_names = ['Video_cat_{}'.format(i) for i in range(n)]
 
 
 def get_video_id(string_video_link):
@@ -16,12 +16,12 @@ def get_video_id(string_video_link):
     return video_id
 
 
-my_new_api = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
-API_KEY = my_new_api  # Remplacez par votre propre clé API
+
+API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"  # Remplacez par votre propre clé API
 
 
 def get_video_details(video_id):
-    youtube = build('youtube', 'v3', developerKey=API_KEY)
+    youtube = build('youtube', 'v3', developerKey=os.getenv("API_KEY"))
 
     try:
         response = youtube.videos().list(
@@ -63,7 +63,7 @@ def get_video_details(video_id):
         }  # 'Nombre d\'abonnés du créateur': [creator_subscriber_number],
 
         df = pd.DataFrame(data)
-        # print(df)
+        df.to_csv(f"/data/{datetime.date()}_extraction.csv")
 
     except HttpError as e:
         print(f"Une erreur s'est produite : {e}")

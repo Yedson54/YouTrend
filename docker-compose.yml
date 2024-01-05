@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  web_app:
+    build: 
+      context: ./web_app  # Ensure the directory 'web_app' exists with a Dockerfile in it
+    volumes:
+      - ./data:/data  # Mounts 'my_volume' to '/data' in the container
+    ports:
+      - "8000:8000"  # Maps port 8000 of the container to port 8000 on the host
+
