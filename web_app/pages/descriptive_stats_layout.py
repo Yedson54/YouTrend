@@ -4,10 +4,25 @@ from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
+import os 
+from datetime import date
+import logging
+import ast
 
 dash.register_page(__name__, name='Statistics', order=2)
 
-base = pd.read_csv('/data/FR_20240105_trends.csv')
+
+nationality_code = ast.literal_eval(os.getenv('NATIONALITY_CODE'))
+date_str = str(date.today()).replace('-', '')
+file_path = f"/data/{'_'.join(nationality_code)}_{date_str}_trends.csv"
+
+# Check if the file exists
+if not os.path.exists(file_path):
+    error_message = f"Error: File not found - {file_path}"
+    logging.error(error_message)
+    
+    
+base = pd.read_csv(file_path)
 base['nbview'] = base['exactViewNumber'].str.extract(
     '([\d|,]+)').replace('\D+', '', regex=True).astype('int')
 base['nblikes'] = base['numberLikes'].replace(

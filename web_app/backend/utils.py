@@ -35,8 +35,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 
-API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
-
 
 
 def get_video_id(video_link: str) -> str:
