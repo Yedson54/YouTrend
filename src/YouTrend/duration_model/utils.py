@@ -38,10 +38,10 @@ from googleapiclient.errors import HttpError
 
 API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
 
-with open("../data/duration_model.pickle", "rb") as f:
+with open("data/duration_model.pickle", "rb") as f:
     MODEL = pickle.load(f)
 
-with open("../data/video_category_encoder.pickle", "rb") as f:
+with open("data/video_category_encoder.pickle", "rb") as f:
     VIDEO_CAT_ENCODER = pickle.load(f)
 
 
