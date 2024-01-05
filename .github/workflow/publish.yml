@@ -3,9 +3,8 @@ name: Publish documentation
 on:
   push:
     branches:
-      - main
-      - 'releases/**'
       - documentation
+      - main
 
 permissions:
   contents: write
@@ -47,4 +46,4 @@ jobs:
       - name: Publish documentation
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: documentation
+          folder: docs
