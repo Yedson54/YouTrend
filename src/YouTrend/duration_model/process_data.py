@@ -14,12 +14,15 @@ Functions:
 """
 import os
 import glob
+import warnings
 from typing import List, Tuple, Optional, Literal
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series, Timedelta
 from sklearn.preprocessing import OneHotEncoder
+
+warnings.filterwarnings(action="ignore")
 
 
 def _load_data(
@@ -67,24 +70,16 @@ def _parse_numeric_column(series: Series) -> Series:
     # Normalize columns (remove whitespace, lowercase, remove ",")
     series = series.str.strip().str.lower().replace(',', '', regex=True)
 
-    # Define a regex pattern to match numbers with optional K or M suffix
-    pattern = r'(\d+(?:\.\d+)?)([KkMm])?'  # regex group capture
-
     # Extract the numeric part and the suffix.
+    pattern = r'(\d+(?:\.\d+)?)([KkMm])?'  # regex group capture
     result_df = series.str.extract(pattern, expand=True)
     numeric_part = pd.to_numeric(result_df[0], errors='coerce')
     suffix_series = result_df[1]
-
     # Define a dictionary to map suffixes to multiplication factors
     suffix_multiplier = {'K': 1e3, 'k': 1e3, 'M': 1e6, 'm': 1e6}
-
-    # Multiply by the corresponding factor based on the suffix
     multiplier = suffix_series.map(suffix_multiplier)
-
-    # Replace NaN values with 1 (default multiplier for rows without a suffix)
-    multiplier = multiplier.fillna(1)
-
-    # Multiply the numeric part by the multiplier, ensure numeric type.
+    multiplier = multiplier.fillna(1) # rows without a suffix
+    # Multiply the numeric part by the multiplier.
     result_series = numeric_part * multiplier
     result_series = pd.to_numeric(result_series, downcast='integer')
 
@@ -210,12 +205,11 @@ def processing_for_duration_model(
     return processed_data
 
 
-### -------------------------------------------------------------------------
-def process_on_loading(
+def preprocessing_on_loading(
         filename: str = None,
         dataframe: pd.DataFrame = None,
         on_loading: bool = False,
-        video_cat_enc: OneHotEncoder = None
+        video_cat_enc: OneHotEncoder = None,
 ) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
     """
     Process the input data for the machine learning model.
@@ -244,9 +238,9 @@ def process_on_loading(
     # Check if either a filename or a DataFrame has been provided
     if filename is None and dataframe is None:
         raise ValueError("Either a filename or a DataFrame must be provided.")
-    elif filename is not None and dataframe is not None:
+    if filename is not None and dataframe is not None:
         raise ValueError("Only one of filename or DataFrame should be provided.")
-    elif filename is not None:
+    if filename is not None:
         # Check if file exists
         if not os.path.isfile(filename):
             raise ValueError(f"File {filename} does not exist.")
@@ -258,6 +252,7 @@ def process_on_loading(
             raise ValueError("Provided DataFrame is empty.")
         df = dataframe
         if on_loading:
+            df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
             encoded_categories = pd.DataFrame(
                 video_cat_enc.transform(
                     df[['videoCategory']].to_numpy().reshape(-1, 1)),
@@ -268,7 +263,14 @@ def process_on_loading(
                 for cat in encoded_categories.columns.get_level_values(0)]
             )
             df = pd.concat([df, encoded_categories], axis=1)
-            return df, None, None
+            prediction_features = [
+                "videoExactPublishDate",
+                "videoLengthSeconds",
+                "creatorSubscriberNumber"
+            ] + encoded_categories.columns.to_list()
+            df = df[prediction_features]
+
+            return df, prediction_features, None
 
     # Convert datetime columns and pass boolean columns to int
     df[date_cols] = df[date_cols].apply(pd.to_datetime, format='ISO8601')
@@ -276,6 +278,7 @@ def process_on_loading(
 
     # Convert timeToTrend in days
     df["timeToTrendDays"] = (df["timeToTrendSeconds"] / 86400).astype(int)
+    df["videoLengthDays"] = (df["videoLengthSeconds"] / 86400).astype(float)
 
     # Extract day of the week from videoExactPublishDate
     df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()

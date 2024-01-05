@@ -22,27 +22,17 @@ Global Constants:
 - MODEL: Loaded machine learning model for predicting video survival probability.
 - VIDEO_CAT_ENCODER: Loaded OneHotEncoder for video categories.
 """
-
-import os
 import re
-import pickle
-from typing import List, Tuple, Optional
-from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict, List
+from urllib.parse import urlparse, parse_qs
 
-# import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
-
-with open("data/duration_model.pickle", "rb") as f:
-    MODEL = pickle.load(f)
-
-with open("data/video_category_encoder.pickle", "rb") as f:
-    VIDEO_CAT_ENCODER = pickle.load(f)
+from youtrend.duration_model.process_data import preprocessing_on_loading
+from youtrend.data import API_KEY
 
 
 def get_video_id(video_link: str) -> str:
@@ -132,105 +122,6 @@ def get_channel_subscriber_count(api: any, channel_ids: List[str]) -> Optional[i
         print(f"An error occurred: {e}")
         return None
 
-def preprocessing(
-        filename: str = None,
-        dataframe: pd.DataFrame = None,
-        on_loading: bool = False,
-        video_cat_enc: OneHotEncoder = None,
-) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
-    """
-    Process the input data for the machine learning model.
-
-    Args:
-        filename (str): Path to the CSV file containing the data.
-        dataframe (pd.DataFrame): DataFrame containing the data.
-
-    Returns:
-        df (pd.DataFrame): Processed DataFrame.
-        model_features (list): List of features for the duration model.
-        encoder (sklearn.preprocessing.OneHotEncoder): OneHotEncoder for
-            later preprocessing before predictions.
-    """
-    # Define features and date columns
-    features = [
-        'videoId', 'videoExactPublishDate', 'creatorSubscriberNumber',
-        'videoLengthSeconds', 'videoCategory', 'isCreatorVerified',
-        'scanTimeStamp', 'firstTrendingTime', 'isTrend',
-        'timeToTrendSeconds'
-    ]
-    date_cols = [
-        'videoExactPublishDate', 'scanTimeStamp', 'firstTrendingTime'
-    ]
-
-    # Check if either a filename or a DataFrame has been provided
-    if filename is None and dataframe is None:
-        raise ValueError("Either a filename or a DataFrame must be provided.")
-    elif filename is not None and dataframe is not None:
-        raise ValueError(
-            "Only one of filename or DataFrame should be provided.")
-    elif filename is not None:
-        # Check if file exists
-        if not os.path.isfile(filename):
-            raise ValueError(f"File {filename} does not exist.")
-        # Read data from CSV file
-        df = pd.read_csv(filename, usecols=features)
-    else:
-        # Check if DataFrame is not empty
-        if dataframe.empty:
-            raise ValueError("Provided DataFrame is empty.")
-        df = dataframe
-        if on_loading:
-            df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
-            encoded_categories = pd.DataFrame(
-                video_cat_enc.transform(
-                    df[['videoCategory']].to_numpy().reshape(-1, 1)),
-                columns=video_cat_enc.categories_
-            )
-            encoded_categories.columns = pd.Index(
-                ['videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
-                 for cat in encoded_categories.columns.get_level_values(0)]
-            )
-            df = pd.concat([df, encoded_categories], axis=1)
-            prediction_features = [
-                "videoExactPublishDate",
-                "videoLengthSeconds",
-                "creatorSubscriberNumber"
-            ] + encoded_categories.columns.to_list()
-            df = df[prediction_features]
-
-            return df, prediction_features, None
-
-    # Convert datetime columns and pass boolean columns to int
-    df[date_cols] = df[date_cols].apply(pd.to_datetime, format='ISO8601')
-    df[["isTrend", "isCreatorVerified"]] = df[[
-        "isTrend", "isCreatorVerified"]].astype(int)
-
-    # Convert timeToTrend in days
-    df["timeToTrendDays"] = (df["timeToTrendSeconds"] / 86400).astype(int)
-
-    # Extract day of the week from videoExactPublishDate
-    df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()
-
-    # One-hot encode the 'videoCategory' column
-    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
-    one_hot = encoder.fit_transform(df[['videoCategory']])
-    categories = encoder.categories_[0]
-    categories = [
-        'videoCat_' + cat.replace(" & ", "_and_").strip().capitalize()
-        for cat in categories
-    ]
-    one_hot_df = pd.DataFrame(one_hot, columns=categories)
-    df = pd.concat([df, one_hot_df], axis=1)
-
-    # Model features for machine learning
-    model_features = [
-        'timeToTrendDays', 'isTrend', 'creatorSubscriberNumber',
-        'videoLengthSeconds',
-    ] + [col for col in df.columns if col.startswith('videoCat_')]
-
-    return df, model_features, encoder
-
-
 def get_video_details(video_link: str,
                       api_key: str = API_KEY,
                       region_code: str = "US",
@@ -291,7 +182,7 @@ def get_video_details(video_link: str,
         df["videoExactPublishDate"] = pd.to_datetime(
             df["videoExactPublishDate"]
         ).dt.tz_localize(None)
-        df, _, _ = preprocessing(dataframe=df, on_loading=True,
+        df, _, _ = preprocessing_on_loading(dataframe=df, on_loading=True,
                                  video_cat_enc=video_cat_enc)
 
         return df

@@ -14,7 +14,7 @@ Functions:
 import os
 import pickle
 import datetime
-from typing import List, Tuple, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -25,23 +25,14 @@ from sklearn.preprocessing import (
 )
 from lifelines import KaplanMeierFitter
 
-from utils import (
-    get_video_details,
-    preprocessing
+from youtrend.duration_model.utils import get_video_details
+from youtrend.data import (
+    MODEL,
+    API_KEY,
+    DURATION_MODEL_DF,
+    VIDEO_CAT_ENCODER,
 )
 
-print(os.getcwd())
-API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
-
-with open("data/duration_model.pickle", "rb") as f:
-    FINAL_MODEL = pickle.load(f)
-
-with open("data/video_category_encoder.pickle", "rb") as f:
-    VIDEO_CAT_ENCODER = pickle.load(f)
-
-super_df, model_features, cat_encoder = preprocessing(
-    'data/duration_model_data.csv'
-)
 
 def _normalize(series, data_max, data_min):
     return np.maximum((series - data_min) / (data_max - data_min), [0])
@@ -80,11 +71,11 @@ def survival_probability(
     ).dt.total_seconds() / (24 * 3600)
 
     scaler = MinMaxScaler()
-    scaler.fit(super_df[['creatorSubscriberNumber']])
+    scaler.fit(DURATION_MODEL_DF[['creatorSubscriberNumber']])
     single_df['creatorSubscriberNumber'] = _normalize(
         single_df['creatorSubscriberNumber'], scaler.data_max_[0], scaler.data_min_[0]
     )
-    scaler.fit(super_df[['videoLengthSeconds']])
+    scaler.fit(DURATION_MODEL_DF[['videoLengthSeconds']])
     single_df['videoLengthSeconds'] = _normalize(
         single_df['videoLengthSeconds'], scaler.data_max_[0], scaler.data_min_[0]
     )
@@ -103,16 +94,16 @@ def survival_probability(
                 X, times=times,ancillary_X=ancillary_X)
         )
 
-    FINAL_MODEL.predict_survival_function_at_single_time = (
-        predict_survival_function_at_single_time.__get__(FINAL_MODEL)
+    MODEL.predict_survival_function_at_single_time = (
+        predict_survival_function_at_single_time.__get__(MODEL)
     )
-    FINAL_MODEL.predict_cumulative_hazard_at_single_time = (
-        predict_cumulative_hazard_at_single_time.__get__(FINAL_MODEL)
+    MODEL.predict_cumulative_hazard_at_single_time = (
+        predict_cumulative_hazard_at_single_time.__get__(MODEL)
     )
 
-    p_surv = FINAL_MODEL.predict_survival_function_at_single_time(
+    p_surv = MODEL.predict_survival_function_at_single_time(
         single_df, single_df['timeToTrendDays']
-    )
+    )[0]
 
     return p_surv
 
@@ -123,7 +114,7 @@ def plot_survival_probability(
         video_link: str = None,
         api_key: str = API_KEY,
         region_code: str = "US",
-        video_cat_enc: OneHotEncoder = cat_encoder
+        video_cat_enc: OneHotEncoder = VIDEO_CAT_ENCODER
 ):
     single_df = get_video_details(
         video_link=video_link,
@@ -165,13 +156,13 @@ def plot_survival_probability(
 def _kmf_model_per_day_and_video_cat(
         day: str,
         category: str,
-        super_df=super_df,
+        full_df: pd.DataFrame = DURATION_MODEL_DF,
         p=0.05,
         random_state=42
 ):
     day, category = day.capitalize(), category.capitalize()
-    valid_days = super_df["dayOfWeek"].unique()
-    valid_categories = super_df["videoCategory"].unique()
+    valid_days = full_df["dayOfWeek"].unique()
+    valid_categories = full_df["videoCategory"].unique()
     # Check that day and categorie are valid
     if not((day in valid_days) & (category in valid_categories)):
         raise ValueError(f"Invalid day {day} or category {category}."
@@ -179,8 +170,8 @@ def _kmf_model_per_day_and_video_cat(
                          f"Choose categories in {valid_categories}")
 
     # Filter the DataFrame based on day and category
-    df = super_df[(super_df["dayOfWeek"] == day) 
-                  & (super_df["videoCategory"] == category)].copy()
+    df = full_df[(full_df["dayOfWeek"] == day) 
+                  & (full_df["videoCategory"] == category)].copy()
 
     def add_ghost_censored_samples(input_df, p=p):
         df: pd.DataFrame = input_df.copy()
@@ -195,7 +186,7 @@ def _kmf_model_per_day_and_video_cat(
 
     print("EMPTY?", df.empty)
     if df.empty:
-        df = super_df[super_df["videoCategory"] == category]
+        df = full_df[full_df["videoCategory"] == category]
         category = "None"
 
     df = add_ghost_censored_samples(df, p)
@@ -205,9 +196,10 @@ def _kmf_model_per_day_and_video_cat(
 
     return kmf_model, category
 
-def plot_survival_probabilities_by_group(day_list, category, super_df=super_df):
-    for day in day_list:
-        kmf, cat = _kmf_model_per_day_and_video_cat(day, category, super_df)
+def plot_survival_probabilities_by_group(days, category):
+    full_df = DURATION_MODEL_DF
+    for day in days:
+        kmf, cat = _kmf_model_per_day_and_video_cat(day, category, full_df)
         kmf.plot(label=f"day={day} and category={cat}")
     plt.xlabel("Duration in Days")
     plt.ylabel('Survival Probability')
