@@ -1,34 +1,29 @@
 """
-utils: Utility Module
+Module: youtube_data_fetcher
 
-This module provides functions for extracting, processing, and analyzing YouTube
-video data to predict the survival probability of a video trending on the platform.
+This module provides functions to fetch details of YouTube videos using the 
+YouTube Data API.
 
-Main Functions:
-- get_video_details(video_link: str, api_key: str = API_KEY, region_code: str = "US",
-                    video_cat_enc: Optional[OneHotEncoder] = None) -> pd.DataFrame:
-  Fetches details of a YouTube video using its link.
+Main Function:
+- get_video_details: Fetches details of a YouTube video using its link.
 
-- get_video_id(video_link: str) -> str:
-  Extracts the video ID from a YouTube video link.
-
-- preprocessing(filename: str = None, dataframe: pd.DataFrame = None,
-                on_loading: bool = False, video_cat_enc: OneHotEncoder = None)
-  -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
-  Process the input data for the machine learning model.
-
-Global Constants:
-- API_KEY (str): YouTube Data API key.
-- MODEL: Loaded machine learning model for predicting video survival probability.
-- VIDEO_CAT_ENCODER: Loaded OneHotEncoder for video categories.
+Other Functions:
+- get_video_id: Extracts the video ID from a YouTube video link.
+- get_category_labels: Retrieves YouTube video category labels.
+- convert_duration_to_seconds: Converts YouTube video duration from ISO 8601
+    format to seconds.
+- get_channel_subscriber_count: Retrieves subscriber count for YouTube
+    channels.
 """
+
 import re
+import warnings
 from typing import Optional, Dict, List
 from urllib.parse import urlparse, parse_qs
 
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
 
 from youtrend.duration_model.process_data import preprocessing_on_loading
@@ -44,18 +39,26 @@ def get_video_id(video_link: str) -> str:
 
     Returns:
     - str: The extracted video ID.
+
+    Usage Example:
+        >>> get_video_id("https://www.youtube.com/watch?v=ABC123")
+        'ABC123'
     """
     parsed_url = urlparse(video_link)
-    video_id = (
-        parsed_url.path[1:]
-        if parsed_url.netloc == 'youtu.be'
-        else parse_qs(parsed_url.query).get('v', [None])[0]
-    )
-    return video_id
+    path_parts = parsed_url.path.split('/')
+
+    if parsed_url.netloc == 'www.youtube.com' or parsed_url.netloc == 'youtu.be':
+        return (parse_qs(parsed_url.query).get('v', [path_parts[-1]])[0]
+                if 'watch' in path_parts else path_parts[-1])
+    
+    warnings.warn("YouTube link not recognized")
+    return None
 
 
-def get_category_labels(api_key: str, region_code: str = 'US',
-                        youtube=None) -> Dict[str, str]:
+def get_category_labels(
+        api_key: str,
+        region_code: str = 'US',
+        youtube: Optional[Resource] = None) -> Dict[str, str]:
     """
     Retrieves YouTube video category labels.
 
@@ -67,20 +70,26 @@ def get_category_labels(api_key: str, region_code: str = 'US',
 
     Returns:
     - Dict[str, str]: Dictionary mapping category IDs to category labels.
+
+    Usage Example:
+        >>> get_category_labels("your_api_key")
+        {'1': 'Film & Animation', '2': 'Autos & Vehicles', ...}
     """
     if youtube is None:
         youtube = build('youtube', 'v3', developerKey=api_key)
 
+    # Fetch video categories
     categories_response = youtube.videoCategories().list(
         part='snippet',
         regionCode=region_code
     ).execute()
 
-    return {
-        category['id']: category['snippet']['title']
-        for category in categories_response['items']
-    }
+    # Map category IDs to category labels
+    return {category['id']: category['snippet']['title']
+            for category in categories_response.get('items', [])}
 
+
+import re
 
 def convert_duration_to_seconds(duration: str) -> int:
     """
@@ -91,14 +100,20 @@ def convert_duration_to_seconds(duration: str) -> int:
 
     Returns:
     - int: Duration in seconds.
+
+    Usage Example:
+        >>> convert_duration_to_seconds("PT3M45S")
+        225
     """
-    duration_pattern = re.compile(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
-    match = duration_pattern.match(duration)
-    return sum(int(n or 0) * factor for n,
-               factor in zip(match.groups(), [3600, 60, 1]))
+    pattern = re.compile(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
+    match = pattern.match(duration)
+    
+    hours, minutes, seconds = map(int, match.groups(default='0'))
+
+    return hours * 3600 + minutes * 60 + seconds
 
 
-def get_channel_subscriber_count(api: any, channel_ids: List[str]) -> Optional[int]:
+def get_channel_subscriber_count(api: Resource, channel_ids: List[str]) -> Optional[int]:
     """
     Retrieves subscriber count for YouTube channels.
 
@@ -108,19 +123,26 @@ def get_channel_subscriber_count(api: any, channel_ids: List[str]) -> Optional[i
 
     Returns:
     - Optional[int]: The subscriber count or None if an error occurs.
+
+    Usage Example:
+        >>> get_channel_subscriber_count(youtube_api_instance, ["channel_id_1", "channel_id_2"])
+        100000
     """
     try:
         response = api.channels().list(
             part="statistics",
             id=','.join(channel_ids)
         ).execute()
-        return (
-            int(response["items"][0]['statistics']["subscriberCount"])
-            if 'items' in response else None
-        )
+
+        items = response.get("items", [])
+        if items:
+            return int(items[0]['statistics'].get("subscriberCount", 0))
+        else:
+            return None
     except HttpError as e:
         print(f"An error occurred: {e}")
         return None
+
 
 def get_video_details(video_link: str,
                       api_key: str = API_KEY,
@@ -140,6 +162,12 @@ def get_video_details(video_link: str,
 
     Returns:
     - pd.DataFrame: DataFrame containing details of the YouTube video.
+
+    Usage Example:
+        >>> get_video_details("https://www.youtube.com/watch?v=ABC123", 
+        >>> ... "your_api_key")
+            videoId             Titre  videoExactPublishDate  videoLengthSeconds  ...
+        0  ABC123  Example Video Title  2022-01-01 12:00:00 
     """
     youtube = build('youtube', 'v3', developerKey=api_key)
 
@@ -166,13 +194,10 @@ def get_video_details(video_link: str,
             'videoLengthSeconds': [convert_duration_to_seconds(
                 video_info['contentDetails']['duration'])
             ],
-            'videoType': [video_info['snippet']['liveBroadcastContent']],
             'videoCategory': [video_info['snippet']['categoryId']],
             'exactViewNumber': [video_info['statistics']['viewCount']],
             'numberLikes': [video_info['statistics']['likeCount']],
             'numberOfComments': [video_info['statistics']['commentCount']],
-            'isCreatorVerified': [video_info['snippet']['channelId']],
-            'videoKeywords': [video_info['snippet'].get('tags', [])],
             'creatorSubscriberNumber': [get_channel_subscriber_count(
                 youtube, [video_info['snippet']['channelId']])
             ]
@@ -183,7 +208,7 @@ def get_video_details(video_link: str,
             df["videoExactPublishDate"]
         ).dt.tz_localize(None)
         df, _, _ = preprocessing_on_loading(dataframe=df, on_loading=True,
-                                 video_cat_enc=video_cat_enc)
+                                            video_cat_enc=video_cat_enc)
 
         return df
 

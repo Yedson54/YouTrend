@@ -15,6 +15,7 @@ Functions:
 import os
 import glob
 import warnings
+from pathlib import Path
 from typing import List, Tuple, Optional, Literal
 
 import numpy as np
@@ -26,16 +27,15 @@ warnings.filterwarnings(action="ignore")
 
 
 def _load_data(
-        folder: str = None,
+        folder: Optional[str] = None,
         pattern: str = "dataset*",
         use_filenames: bool = False,
-        filenames: List[str] = None) -> pd.DataFrame:
+        filenames: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Load data from a folder or specific files.
 
     Args:
-        folder (str, optional): The path to the folder containing the data
-            files.
+        folder (str, optional): The path to the folder containing the data files.
         pattern (str, optional): The pattern to match files in the folder.
         use_filenames (bool, optional): If True, use the filenames provided in
             the 'filenames' parameter. If False, load all files in the folder.
@@ -48,9 +48,17 @@ def _load_data(
     if use_filenames:
         files = filenames
     else:
-        files = glob.glob(rf"{folder}/{pattern}")
+        folder_path = Path(folder)
+        files = list(folder_path.glob(pattern))
 
+        # Check if any files were found
+        if not files:
+            raise FileNotFoundError(f"No files found with pattern '{pattern}' in folder '{folder}'.")
+
+    # Read data from files into a list of DataFrames
     dfs = [pd.read_csv(file, index_col=0) for file in files]
+
+    # Concatenate DataFrames into a single DataFrame
     concat_df = pd.concat(dfs, ignore_index=True)
 
     return concat_df
@@ -68,20 +76,17 @@ def _parse_numeric_column(series: Series) -> Series:
             numeric values.
     """
     # Normalize columns (remove whitespace, lowercase, remove ",")
-    series = series.str.strip().str.lower().replace(',', '', regex=True)
+    series = series.str.replace(r'\s|,', '', regex=True).str.lower()
 
     # Extract the numeric part and the suffix.
-    pattern = r'(\d+(?:\.\d+)?)([KkMm])?'  # regex group capture
+    pattern = r'(\d+(?:\.\d+)?)([KkMm]?)'  # regex group capture
     result_df = series.str.extract(pattern, expand=True)
-    numeric_part = pd.to_numeric(result_df[0], errors='coerce')
-    suffix_series = result_df[1]
-    # Define a dictionary to map suffixes to multiplication factors
-    suffix_multiplier = {'K': 1e3, 'k': 1e3, 'M': 1e6, 'm': 1e6}
-    multiplier = suffix_series.map(suffix_multiplier)
-    multiplier = multiplier.fillna(1) # rows without a suffix
-    # Multiply the numeric part by the multiplier.
-    result_series = numeric_part * multiplier
-    result_series = pd.to_numeric(result_series, downcast='integer')
+
+    # Replace (45K or 45k -> 45_000), (45M or 45m -> 45_000_000)
+    result_series = (
+        pd.to_numeric(result_df[0], errors='coerce') *
+        result_df[1].map({'K': 1e3, 'k': 1e3, 'M': 1e6, 'm': 1e6}).fillna(1)
+    ).astype('Int64')
 
     return result_series
 
@@ -96,30 +101,25 @@ def _clean_columns(data: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The cleaned DataFrame.
     """
-    df = data.copy()
-
     # Datetime columns
-    df["videoExactPublishDate"] = pd.to_datetime(
-        df["videoExactPublishDate"], utc=True
-    )
-    df["scanTimeStamp"] = pd.to_datetime(
-        df["scanTimeStamp"], unit="s", utc=True
-    )
+    data["videoExactPublishDate"] = pd.to_datetime(data["videoExactPublishDate"], utc=True)
+    data["scanTimeStamp"] = pd.to_datetime(data["scanTimeStamp"], unit="s", utc=True)
 
     # Numeric columns
-    df["numberLikes"] = _parse_numeric_column(df["numberLikes"])
-    df["exactViewNumber"] = _parse_numeric_column(df["exactViewNumber"])
-    df["numberOfComments"] = _parse_numeric_column(df["numberOfComments"])
-    df["creatorSubscriberNumber"] = _parse_numeric_column(
-        df["creatorSubscriberNumber"]
-    )
+    # numeric_columns = ["numberLikes", "exactViewNumber",
+    #                    "numberOfComments", "creatorSubscriberNumber"]
+    numeric_columns = data.columns[
+        data.columns.str.contains(r"number|Number", regex=True)
+    ]
+    data[numeric_columns] = data[numeric_columns].apply(_parse_numeric_column)
 
-    return df
+    return data
 
 
 def _create_duration_model_columns(
         data: DataFrame,
-        frequency: Literal["hour", "day"] = "hour"
+        frequency: Literal["hour", "day"] = "hour",
+        delay: int = 1.5
 ) -> DataFrame:
     """
     Adjust the end date of the data based on the chosen frequency and compute
@@ -128,17 +128,17 @@ def _create_duration_model_columns(
     Args:
         data (DataFrame): The DataFrame containing the data.
         frequency (Literal["hour", "day"]): The frequency for the adjustment.
-            If "hour", subtract 1 hour from the end date.
-            If "day", subtract 1 day from the end date.
+            If "hour", subtract `delay` hour from the end date.
+            If "day", subtract `delay` day from the end date.
             Other possible values: see `pandas.Timedelta()`.
 
     Returns:
         DataFrame: The DataFrame with the time to trend in seconds.
     """
     df = data.copy()
-    start_date = pd.to_datetime(df["videoExactPublishDate"].min())
-    end_date = pd.to_datetime(df["scanTimeStamp"].max())
-    end_date -= Timedelta(value=1.5, unit=frequency)
+    start_date = pd.to_datetime(data["videoExactPublishDate"].min())
+    end_date = (pd.to_datetime(data["scanTimeStamp"].max())
+                - pd.Timedelta(value=delay, unit=frequency))
 
     # Compute the time spent before entering in the trending list.
     first_trending_time = df.groupby("videoId")["scanTimeStamp"].min()
@@ -151,14 +151,13 @@ def _create_duration_model_columns(
     # Determine whether or not the video has been trending
     df["isTrend"] = np.logical_and(
         df["firstTrendingTime"] >= start_date,
-        df["firstTrendingTime"] <= end_date
-    )
+        df["firstTrendingTime"] <= end_date)
 
     return df.sort_index()
 
 
 def processing_for_duration_model(
-        folder: str = "../../../data", #TODO: move data folder closer
+        folder: str = "original_data",
         pattern: str = "dataset*",
         use_filenames: bool = False,
         filenames: List[str] = None,
@@ -172,7 +171,7 @@ def processing_for_duration_model(
 
     Args:
         folder (str, optional): The path to the folder containing the data
-            files.
+            files. Defaults to "original_data".
         pattern (str, optional): The pattern to match files in the folder.
         use_filenames (bool, optional): If True, use the filenames provided
             in the 'filenames' parameter. If False, load all files in the
@@ -188,9 +187,15 @@ def processing_for_duration_model(
     Returns:
         DataFrame: The processed DataFrame for the duration model.
     """
+    if folder == "original_data":
+        module_path = os.path.dirname(os.path.abspath(__file__))
+        data_folder = os.path.join(module_path, "..", "data", folder)
+    else:
+        data_folder = folder
+
     # Load data
     data = _load_data(
-        folder=folder,
+        folder=data_folder,
         pattern=pattern,
         use_filenames=use_filenames,
         filenames=filenames
