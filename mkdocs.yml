@@ -1,8 +1,7 @@
 site_name: YouTrend
 site_url: https://example.com/
-index_page: home.md
 nav:
-  - Home: home.md
+  - Home: index.md
   - Duration model:
       - Data preprocessing: duration_model/process_data.md
       - Make Prediction: duration_model/make_prediction.md
