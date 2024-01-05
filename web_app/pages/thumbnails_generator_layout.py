@@ -9,7 +9,7 @@ import io
 import json
 import os
 
-dash.register_page(__name__, name='Stable Diffusion Model')
+dash.register_page(__name__, name='Stable Diffusion Model', order=4)
 
 center_style = {'textAlign': 'center', 'color': '#6D071A'}
 button_style = {'display': 'block'}

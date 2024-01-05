@@ -5,7 +5,7 @@ import pandas as pd
 
 dash.register_page(__name__, path='/', name='Main',order=1)
 
-base = pd.read_csv('/data/french_youtube_10_12_23.csv')
+base = pd.read_csv('/data/FR_20240105_trends.csv')
 base['nbview'] = base['exactViewNumber'].str.extract(
     '([\d|,]+)').replace('\D+', '', regex=True).astype('int')
 base['nblikes'] = base['numberLikes'].replace(

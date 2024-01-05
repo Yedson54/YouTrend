@@ -5,9 +5,9 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 
-dash.register_page(__name__, name='Statistics')
+dash.register_page(__name__, name='Statistics', order=2)
 
-base = pd.read_csv('/data/french_youtube_10_12_23.csv')
+base = pd.read_csv('/data/FR_20240105_trends.csv')
 base['nbview'] = base['exactViewNumber'].str.extract(
     '([\d|,]+)').replace('\D+', '', regex=True).astype('int')
 base['nblikes'] = base['numberLikes'].replace(
