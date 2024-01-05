@@ -1,0 +1,44 @@
+site_name: YouTrend
+site_url: https://example.com/
+index_page: home.md
+nav:
+  - Home: home.md
+  - Duration model:
+      - Data preprocessing: duration_model/process_data.md
+      - Make Prediction: duration_model/make_prediction.md
+      - Utility: duration_model/utils.md
+  - App:
+      - Subsection 1: app/app_1.md
+  - Scraper: scraper.md
+
+theme:
+  name: material
+  features:
+    - content.code.annotate
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - section-index
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.magiclink
+  - pymdownx.details
+  - attr_list
