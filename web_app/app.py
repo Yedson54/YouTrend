@@ -6,6 +6,8 @@ app = dash.Dash(
     use_pages=True,
     external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+app.config.suppress_callback_exceptions = True
+server = app.server
 
 navbar = dbc.NavbarSimple(
     children=[
@@ -24,4 +26,4 @@ app.layout = dbc.Container([
 ], fluid=True)
 
 if __name__ == "__main__":
-    app.run_server(port=4050)
+    app.run_server(debug=True)

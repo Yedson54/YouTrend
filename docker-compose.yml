@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: etl
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data  # Mounts 'my_volume' to '/data' in the container
+  web_app:
+    build: 
+      context: ./web_app  # Ensure the directory 'web_app' exists with a Dockerfile in it
+    volumes:
+      - ./data:/data  # Mounts 'my_volume' to '/data' in the container
+    ports:
+      - "8000:8000"  # Maps port 8000 of the container to port 8000 on the host
+
