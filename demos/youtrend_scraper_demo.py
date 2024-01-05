@@ -277,10 +277,9 @@ def update_meta_data(data_dictionary):
 # 2) Fill it with the youtube_id information, and with other basic information using 
 # 2  post_request_ytb, add_now_videos_shorts and add_other_sections functions
 # 3) Update the data_dictionary with individual data by calling update_video_data and _update_meta_data functions
+# 4) Create the corresponding .csv file within the /data directory
 
 
-
-"""
 # 1
 french_data_dictionary = {
 "videoTitle": [],
@@ -320,8 +319,6 @@ add_other_sections(response_dict, french_data_dictionary)
 update_video_data(french_data_dictionary)
 update_meta_data(french_data_dictionary)
 
-
-df = pd.DataFrame(french_data_dictionary)
-
-print(df.head())                             \
-"""
+# 4
+trending_df = pd.DataFrame(french_data_dictionary)
+trending_df.to_csv("../data/french_youtube_today.csv")
