@@ -13,14 +13,13 @@ Functions:
   chosen frequency and compute the duration before trending for each video.
 """
 import os
-import glob
 import warnings
 from pathlib import Path
 from typing import List, Tuple, Optional, Literal
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series, Timedelta
+from pandas import DataFrame, Series
 from sklearn.preprocessing import OneHotEncoder
 
 warnings.filterwarnings(action="ignore")
@@ -30,7 +29,7 @@ def _load_data(
         folder: Optional[str] = None,
         pattern: str = "dataset*",
         use_filenames: bool = False,
-        filenames: Optional[List[str]] = None) -> pd.DataFrame:
+        filenames: Optional[List[str]] = None) -> DataFrame:
     """
     Load data from a folder or specific files.
 
@@ -53,7 +52,9 @@ def _load_data(
 
         # Check if any files were found
         if not files:
-            raise FileNotFoundError(f"No files found with pattern '{pattern}' in folder '{folder}'.")
+            raise FileNotFoundError(
+                f"No files found with pattern '{pattern}' in folder "
+                f"'{folder}'.")
 
     # Read data from files into a list of DataFrames
     dfs = [pd.read_csv(file, index_col=0) for file in files]
@@ -91,7 +92,7 @@ def _parse_numeric_column(series: Series) -> Series:
     return result_series
 
 
-def _clean_columns(data: pd.DataFrame) -> pd.DataFrame:
+def _clean_columns(data: DataFrame) -> DataFrame:
     """
     Clean columns in a DataFrame.
 
@@ -189,7 +190,7 @@ def processing_for_duration_model(
     """
     if folder == "original_data":
         module_path = os.path.dirname(os.path.abspath(__file__))
-        data_folder = os.path.join(module_path, "..", "data", folder)
+        data_folder = os.path.join(module_path, "..", "data", folder) #TODO: it is using the folder "youtube.data"
     else:
         data_folder = folder
 
@@ -212,7 +213,7 @@ def processing_for_duration_model(
 
 def preprocessing_on_loading(
         filename: str = None,
-        dataframe: pd.DataFrame = None,
+        dataframe: DataFrame = None,
         on_loading: bool = False,
         video_cat_enc: OneHotEncoder = None,
 ) -> Tuple[pd.DataFrame, Optional[List[str]], Optional[OneHotEncoder]]:
@@ -239,6 +240,7 @@ def preprocessing_on_loading(
     date_cols = [
         'videoExactPublishDate', 'scanTimeStamp', 'firstTrendingTime'
     ]
+    bool_cols = ["isTrend", "isCreatorVerified"]
 
     # Check if either a filename or a DataFrame has been provided
     if filename is None and dataframe is None:
@@ -279,11 +281,13 @@ def preprocessing_on_loading(
 
     # Convert datetime columns and pass boolean columns to int
     df[date_cols] = df[date_cols].apply(pd.to_datetime, format='ISO8601')
-    df[["isTrend", "isCreatorVerified"]] = df[["isTrend", "isCreatorVerified"]].astype(int)
+    df[bool_cols] = df[bool_cols].astype(int)
 
-    # Convert timeToTrend in days
-    df["timeToTrendDays"] = (df["timeToTrendSeconds"] / 86400).astype(int)
-    df["videoLengthDays"] = (df["videoLengthSeconds"] / 86400).astype(float)
+    # Convert in days
+    convert_in_days_cols, new_names_days_cols = zip(*[
+        ("timeToTrendSeconds", "timeToTrendDays"),
+        ("videoLengthSeconds", "videoLengthDays")])
+    df[list(new_names_days_cols)] = (df[list(convert_in_days_cols)] / 86400).astype(float)
 
     # Extract day of the week from videoExactPublishDate
     df["dayOfWeek"] = df["videoExactPublishDate"].dt.day_name()

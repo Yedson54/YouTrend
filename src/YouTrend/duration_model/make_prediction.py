@@ -7,35 +7,25 @@ creator's subscriber count, and publication date.
 
 Functions:
 - survival_probability: Calculate survival probability for a video.
-
-- plot_survival_probability:  Plot the survival probability over a specified
-    duration for a given video.
+- plot_survival_probability: Plot the survival probability over a specified
+  duration for a given video.
 """
-import os
-import pickle
 import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import (
-    MinMaxScaler,
-    OneHotEncoder,
-)
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from lifelines import KaplanMeierFitter
 
 from youtrend.duration_model.utils import get_video_details
-from youtrend.data import (
-    MODEL,
-    API_KEY,
-    DURATION_MODEL_DF,
-    VIDEO_CAT_ENCODER,
-)
+from youtrend.data import MODEL, API_KEY, DURATION_MODEL_DF, VIDEO_CAT_ENCODER
 
 
 def _normalize(series, data_max, data_min):
     return np.maximum((series - data_min) / (data_max - data_min), [0])
+
 
 def survival_probability(
         video_link,
@@ -56,7 +46,11 @@ def survival_probability(
 
     Returns:
     - Survival probability as a float.
-    """
+
+    Example:
+    >>> survival_probability("youtube.com/video123", date="2022-01-01")
+    0.85
+    """ 
     single_df = get_video_details(
         video_link=video_link,
         api_key=api_key,
@@ -91,7 +85,7 @@ def survival_probability(
             self, X, times, ancillary_X=None):
         return np.exp(
             -self.predict_cumulative_hazard_at_single_time(
-                X, times=times,ancillary_X=ancillary_X)
+                X, times=times, ancillary_X=ancillary_X)
         )
 
     MODEL.predict_survival_function_at_single_time = (
@@ -107,6 +101,7 @@ def survival_probability(
 
     return p_surv
 
+
 def plot_survival_probability(
         start_date: Optional[str] = None,
         duration_days: int = 10,
@@ -116,6 +111,21 @@ def plot_survival_probability(
         region_code: str = "US",
         video_cat_enc: OneHotEncoder = VIDEO_CAT_ENCODER
 ):
+    """
+    Plot the survival probability over a specified duration for a given video.
+
+    Parameters:
+    - start_date: The starting date for the analysis.
+    - duration_days: Duration of the analysis in days.
+    - gap: Time gap between each analysis point.
+    - video_link: The link to the video.
+    - api_key: YouTube Data API key.
+    - region_code: Region code for fetching category labels.
+    - video_cat_enc: One-hot encoder for video categories.
+
+    Example:
+    >>> plot_survival_probability(start_date="2022-01-01", duration_days=10, gap=0.5, video_link="youtube.com/video123")
+    """ 
     single_df = get_video_details(
         video_link=video_link,
         api_key=api_key,
@@ -159,7 +169,24 @@ def _kmf_model_per_day_and_video_cat(
         full_df: pd.DataFrame = DURATION_MODEL_DF,
         p=0.05,
         random_state=42
-):
+) -> Tuple[KaplanMeierFitter, str]:
+    """
+    Create Kaplan-Meier survival model for a specific day and video category.
+
+    Parameters:
+    - day: The day of the week (e.g., "Monday").
+    - category: The video category.
+    - full_df: The full DataFrame of duration model data.
+    - p: Proportion of ghost censored samples to add.
+    - random_state: Random state for reproducibility.
+
+    Returns:
+    - A tuple containing the Kaplan-Meier model and the video category.
+
+    Example:
+    >>> kmf_model, cat = _kmf_model_per_day_and_video_cat("Monday", "Music")
+    >>> kmf_model.plot_survival_function()
+    """
     day, category = day.capitalize(), category.capitalize()
     valid_days = full_df["dayOfWeek"].unique()
     valid_categories = full_df["videoCategory"].unique()
@@ -184,7 +211,6 @@ def _kmf_model_per_day_and_video_cat(
             df = pd.concat([df, last_lines_df])
         return df
 
-    print("EMPTY?", df.empty)
     if df.empty:
         df = full_df[full_df["videoCategory"] == category]
         category = "None"
@@ -196,10 +222,23 @@ def _kmf_model_per_day_and_video_cat(
 
     return kmf_model, category
 
+
 def plot_survival_probabilities_by_group(days, category):
-    full_df = DURATION_MODEL_DF
+    """
+    Plot survival probabilities by group for specific days and video category.
+
+    Parameters:
+    - days: List of days to consider.
+    - category: The video category.
+
+    Example:
+    >>> plot_survival_probabilities_by_group(["Monday", "Tuesday"], "Music")
+    """ 
+    category = category.capitalize()
     for day in days:
-        kmf, cat = _kmf_model_per_day_and_video_cat(day, category, full_df)
+        kmf, cat = _kmf_model_per_day_and_video_cat(
+            day, category, DURATION_MODEL_DF
+        )
         kmf.plot(label=f"day={day} and category={cat}")
     plt.xlabel("Duration in Days")
     plt.ylabel('Survival Probability')

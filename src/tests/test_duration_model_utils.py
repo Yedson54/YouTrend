@@ -84,3 +84,8 @@ def test_get_video_details():
     assert isinstance(result_df["videoExactPublishDate"].iloc[0], pd.Timestamp)
     # assert result_df["videoCategory"].str.isalpha().all()
     assert any(result_df.columns.str.startswith("videoCat_"))
+
+
+# Run the tests
+if __name__ == "__main__":
+    pytest.main([__file__])
