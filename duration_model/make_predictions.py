@@ -26,11 +26,8 @@ from backend.utils import (
     get_video_details
 )
 
-from dotenv import load_dotenv
-from os.path import join, dirname
-dotenv_path = join(dirname(__file__), '.env')
-load_dotenv(dotenv_path)
-print(dotenv_path)
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+print(YOUTUBE_API_KEY)
 
 with open("backend/models/duration_model.pickle", "rb") as f:
     FINAL_MODEL = pickle.load(f)
