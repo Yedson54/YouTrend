@@ -2,13 +2,10 @@ site_name: YouTrend
 site_url: https://example.com/
 nav:
   - Home: index.md
-  - Duration model:
-      - Data preprocessing: duration_model/process_data.md
-      - Make Prediction: duration_model/make_prediction.md
-      - Utility: duration_model/utils.md
-  - App:
-      - Subsection 1: app/app_1.md
+  - App: app.md
+  - Duration model: duration_model.md
   - Scraper: scraper.md
+  - Stable Diffusion: sable_diffusion.md
 
 theme:
   name: material
