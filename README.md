@@ -52,7 +52,7 @@ The project is built around 2 containers (available on the docker-compose): the 
 
 <!-- WEB APP -->
 ## Web Application
-Our Dash web app allows users to view information about a selected artist() and receive song recommendations using ML. The app is hosted on the local machine at http://localhost:8000/.
+Our Dash web app allows users to view information about Youtube trends. The app is hosted on the local machine at http://localhost:8000/.
 
 The first tab is an overview of the current YouTube trends. Together with the second tab, they provide statistical information such as the average number of views or likes per top creator, as well as others graphs such as the number of trending videos by category, etc... This format allows for an easy understanding of the selected categories and youtubers.
 
