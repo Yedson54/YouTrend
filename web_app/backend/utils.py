@@ -18,7 +18,7 @@ Main Functions:
   Process the input data for the machine learning model.
 
 Global Constants:
-- API_KEY (str): YouTube Data API key.
+- YOUTUBE_API_KEY (str): YouTube Data API key.
 """
 
 import os
@@ -35,7 +35,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 
-
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 
 def get_video_id(video_link: str) -> str:
     """
@@ -224,7 +224,7 @@ def preprocessing(
 
 
 def get_video_details(video_link: str,
-                      api_key: str = API_KEY,
+                      api_key: str = YOUTUBE_API_KEY,
                       region_code: str = "US",
                       video_cat_enc: Optional[OneHotEncoder] = None
                       ) -> pd.DataFrame:
@@ -293,7 +293,7 @@ def get_video_details(video_link: str,
         return None
 
 def get_video_details2(video_id):
-    youtube = build('youtube', 'v3', developerKey=API_KEY)
+    youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
 
     try:
         response = youtube.videos().list(
