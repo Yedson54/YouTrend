@@ -26,8 +26,7 @@ from backend.utils import (
     get_video_details
 )
 
-API_KEY = "AIzaSyCkx5_g8o7bYQkra1_IGYE8LNxHO5yEsAk"
-
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 with open("backend/models/duration_model.pickle", "rb") as f:
     FINAL_MODEL = pickle.load(f)
 
