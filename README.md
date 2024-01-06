@@ -72,7 +72,14 @@ git clone https://github.com/Yedson54/YouTrend.git
 ```sh
 cd YouTrend
 ```
-3. Launch the app
+3. Create a .env file at the root of the working directory with several elements (can be modified). One of them is the Youtube API Key that you can obtain following this [procedure](https://developers.google.com/youtube/v3/getting-started): 
+```sh
+TRENDING_TYPE_DICT = {'Now': None,'Music': '4gINGgt5dG1hX2NoYXJ0cw%3D%3D','Gaming': '4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D','Movie': '4gIKGgh0cmFpbGVycw%3D%3D'}
+# COUNTRY_CODE_LIST = ['US', 'CA', 'AU']
+NATIONALITY_CODE = ['FR']
+YOUTUBE_API_KEY =[YOUR_YOUTUBE_API_KEY] 
+```
+4. Launch the app
 Since we have a multi-container Docker application (as defined in the docker-compose.yml), you can run the full project (scraper and web app) by running the following command:
 
 ```sh
