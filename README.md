@@ -29,7 +29,7 @@ The following project is realized as part of the computer science course given b
 
 <br>
 
-In this repository, you will find the following elements:
+In this repository, you will find the following elements: 
 * A duration_model folder that contain the model that has been trained and the data used for the train. This model is then used for inference in the app.
 * A Docker-compose.yml which orchestrates the containers.
 * Some Docker Images : each of the following folder corresponds to an Image to build (with Python):
