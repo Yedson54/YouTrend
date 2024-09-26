@@ -1,0 +1,8 @@
+title: YouTrend
+description: YouTube Trending Video
+theme: jekyll-theme-minimal
+
+# Color Customization
+minima:
+  color: "#FF5733"      # Main color (replace with your desired red color code)
+  accent_color: "#FF5733"  # Acc
