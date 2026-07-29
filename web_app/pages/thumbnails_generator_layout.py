@@ -135,7 +135,7 @@ def query_and_save_image(prompt, img_count, token):
     if response.status_code == 200:
         image = Image.open(io.BytesIO(response.content))
         max_size = (450, 450)
-        image.thumbnail(max_size, Image.ANTIALIAS)
+        image.thumbnail(max_size, Image.Resampling.LANCZOS)
         dir_path = "assets"
         if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
