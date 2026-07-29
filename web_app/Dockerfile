@@ -1,4 +1,4 @@
-FROM python:3.9.16
+FROM python:3.10
 
 # Create a working directory.
 RUN mkdir wd
@@ -13,4 +13,3 @@ COPY . ./
 
 # Finally, run gunicorn.
 CMD [ "gunicorn", "--workers=5", "--threads=1", "-b 0.0.0.0:8000", "app:server"]
-
